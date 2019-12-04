@@ -10,9 +10,8 @@ namespace adventOfCode
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
-            var workDir = System.IO.Directory.GetCurrentDirectory();
-            var storeClient = new StoreClient($@"{workDir}\store");
+            Console.WriteLine("Hello Advent Of Code!");
+            var storeClient = new StoreClient($@"{System.IO.Directory.GetCurrentDirectory()}\store");
             var answer = SolveFirstDay(storeClient);
             Console.WriteLine(answer);
         }
