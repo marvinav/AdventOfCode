@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -13,8 +14,8 @@ namespace adventOfCode
         {
             Console.WriteLine("Hello Advent Of Code!");
             var storeClient = new StoreClient($@"{System.IO.Directory.GetCurrentDirectory()}\store");
-            var answer = SolveSecondDay(storeClient);
-            Console.WriteLine(answer);
+            var day = new DayFour(storeClient.GetInput(2019, 4));
+            Console.WriteLine(day.Answer);
         }
 
         public static int SolveFirstDay(StoreClient storeClient)
@@ -82,5 +83,127 @@ namespace adventOfCode
             }
             return result;
         }
+
+        public static string SolveThirdDay(StoreClient client)
+        {
+            var input = client.GetInput(2019, 3).Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+            var wires = new List<string[]>();
+            var wireMap = new Dictionary<(int, int), List<WirePath>>();
+
+            foreach (var wire in input)
+            {
+                wires.Add(wire.Split(",", StringSplitOptions.None));
+            }
+
+            Action<(int, int), WirePath> addToWireMap = (xy, wirePath) =>
+            {
+                if (wireMap.TryGetValue(xy, out var cell))
+                {
+                    if (cell.Count(wp => wp.WireId == wirePath.WireId) == 0)
+                    {
+                        cell.Add(wirePath);
+                    }
+                }
+                else
+                {
+                    wireMap.Add(xy, new List<WirePath>() { wirePath });
+                }
+            };
+            Action<int> createWireMap = (wireId) =>
+            {
+                int currentX = 0;
+                int currentY = 0;
+                int step = 0;
+                foreach (var wirePath in wires[wireId])
+                {
+                    var value = int.Parse(wirePath.Substring(1));
+                    var wireCell = new WirePath(wireId, step);
+                    switch (wirePath.ElementAt(0))
+                    {
+                        case 'U':
+                            for (int i = currentY + 1; i <= currentY + value; i++)
+                            {
+                                step++;
+                                wireCell.StepCount = step;
+                                addToWireMap((currentX, i), wireCell);
+                            }
+                            currentY += value;
+                            break;
+                        case 'D':
+                            for (int i = currentY - 1; i >= currentY - value; i--)
+                            {
+                                step++;
+                                wireCell.StepCount = step;
+                                addToWireMap((currentX, i), wireCell);
+                            }
+                            currentY -= value;
+                            break;
+                        case 'R':
+                            for (int i = currentX + 1; i <= currentX + value; i++)
+                            {
+                                step++;
+                                wireCell.StepCount = step;
+                                addToWireMap((i, currentY), wireCell);
+                            }
+                            currentX += value;
+                            break;
+                        case 'L':
+                            for (int i = currentX - 1; i >= currentX - value; i--)
+                            {
+                                step++;
+                                wireCell.StepCount = step;
+                                addToWireMap((i, currentY), wireCell);
+                            }
+                            currentX -= value;
+                            break;
+                        default:
+                            throw new Exception();
+                    }
+                }
+            };
+
+            for (int i = 0; i < wires.Count; i++)
+            {
+                createWireMap(i);
+            }
+            wireMap.Remove((0, 0));
+
+            var answer = new Answer(0, 0);
+            foreach (var cross in wireMap.Where(x => x.Value.Count > 1))
+            {
+                var distance = Math.Abs(cross.Key.Item1) + Math.Abs(cross.Key.Item2);
+                var curManhattan = answer.MinimalManhattanDistance;
+                answer.MinimalManhattanDistance = curManhattan == 0 || curManhattan > distance ? distance : answer.MinimalManhattanDistance;
+                var steps = cross.Value[0].StepCount + cross.Value[1].StepCount;
+                answer.MinimalSteps = answer.MinimalSteps == 0 || answer.MinimalSteps > steps ? steps : answer.MinimalSteps;
+
+            }
+            return $"Manhattan : {answer.MinimalManhattanDistance} \nMinimal : {answer.MinimalSteps}";
+        }
+
+        public struct WirePath
+        {
+            public int WireId { get; set; }
+            public int StepCount { get; set; }
+
+            public WirePath(int wireId, int stepCount)
+            {
+                WireId = wireId;
+                StepCount = stepCount;
+            }
+        }
+
+        public struct Answer
+        {
+            public int MinimalManhattanDistance { get; set; }
+            public int MinimalSteps { get; set; }
+
+            public Answer(int manhattan, int steps)
+            {
+                MinimalManhattanDistance = manhattan;
+                MinimalSteps = steps;
+            }
+        }
+
     }
 }
