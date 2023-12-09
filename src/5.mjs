@@ -5,9 +5,27 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const clearLastLine = () => {
-  process.stdout.moveCursor(0, -1); // up one line
-  process.stdout.clearLine(1); // from cursor to end
+const paths = [
+  "humidity",
+  "temperature",
+  "light",
+  "water",
+  "fertilizer",
+  "soil",
+];
+
+const getPrevNode = (mapNode, destIndex) => {
+  const node = mapNode.find((mn) => {
+    return mn.destStart <= destIndex && mn.destStart + mn.count > destIndex;
+  }) ?? {
+    srcStart: destIndex,
+    destStart: destIndex,
+    count: 0,
+  };
+
+  const diff = destIndex - node.destStart;
+
+  return diff + node.srcStart;
 };
 
 /**
@@ -21,37 +39,36 @@ const solvePuzzle = (puzzleData, part) => {
   const matches = puzzleData.matchAll(test);
 
   const map = {};
-  const leaf = {};
+
   const direction = [];
   [...matches].forEach((x) => {
-    const { seeds, src, dest, rules, target } = x.groups;
+    const { seeds, dest, rules, target } = x.groups;
 
     if (seeds && target) {
-      map.seed = target
+      const parsedSeeds = target
         .split(/ |\n/gim)
         .filter((x) => x != "")
         .map((x) => Number.parseInt(x, 10));
 
-      // if (part === 2) {
-      //   const rangedSeed = [];
+      if (part === 1) {
+        map.seed = parsedSeeds.map((x) => ({ start: x, end: x }));
+      }
 
-      //   for (let i = 0; i < map.seed.length; i = i + 2) {
-      //     const start = map.seed[i];
-      //     const end = map.seed[i + 1];
-      //     const seedWithinRange = new Array(end)
-      //       .fill(0)
-      //       .map((x, ind) => start + ind);
-      //     console.log(end, seedWithinRange);
+      if (part === 2) {
+        const rangedSeed = [];
 
-      //     rangedSeed.push(...seedWithinRange);
-      //   }
+        for (let i = 0; i < parsedSeeds.length; i = i + 2) {
+          const start = parsedSeeds[i];
+          const end = start + parsedSeeds[i + 1] - 1;
+          rangedSeed.push({ start, end });
+        }
 
-      //   map.seed = rangedSeed;
-      // }
-      // map.seed = map.seed.sort((a, b) => a - b);
+        map.seed = rangedSeed;
+      }
 
       return;
     }
+
     direction.push(dest);
 
     const ruleSplitted = rules.split("\n").filter((x) => x != "");
@@ -77,42 +94,17 @@ const solvePuzzle = (puzzleData, part) => {
 
   let min = Number.MAX_VALUE;
 
-  for (let i = 0; i < map.seed.length; i = i + part) {
-    const start = map.seed[i];
-    const end = part === 2 ? map.seed[i + 1] + start : start;
+  for (let location = 0; location < Number.MAX_VALUE; location++) {
+    let startPath = getPrevNode(map.location, location);
+    paths.forEach((x) => {
+      startPath = getPrevNode(map[x], startPath);
+    });
 
-    for (let p = start; p <= end; p = p + 1) {
-      let currentNodeNumber = p;
-      direction.forEach((d) => {
-        const rule = map[d].find(
-          (r) =>
-            r.srcStart + r.count > currentNodeNumber &&
-            r.srcStart <= currentNodeNumber
-        ) ?? {
-          srcStart: currentNodeNumber,
-          destStart: currentNodeNumber,
-          count: 0,
-        };
-
-        const diff = currentNodeNumber - rule.srcStart;
-
-        currentNodeNumber = rule.destStart + diff;
-      });
-
-      if (min > currentNodeNumber) {
-        min = currentNodeNumber;
-      }
+    if (map.seed.find((x) => startPath >= x.start && x.end >= startPath)) {
+      min = location;
+      break;
     }
   }
-
-  // for (let i = direction.length - 1; i > 0; i--) {
-  //   const d = direction[i - 1];
-  //   const next = direction[i];
-
-  //   let minStart = next[d].destStart;
-  //   let minEnd = minStart + next[d].count;
-  // }
-
   return min;
 };
 
@@ -160,4 +152,4 @@ const dayInput = fs
   .toString();
 
 console.log("First part:\t", solvePuzzle(dayInput, 1));
-// console.log("Second part:\t", solvePuzzle(dayInput, 2));
+console.log("Second part:\t", solvePuzzle(dayInput, 2));
