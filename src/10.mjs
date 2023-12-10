@@ -13,7 +13,6 @@ const pipes = {
   7: [-1, -2], // -3 3
   F: [-1, 2], // 1 3
   ".": [0, 0],
-  S: [1, -1],
 };
 
 const directions = [
@@ -24,6 +23,23 @@ const directions = [
 ];
 
 //451, 295
+
+const startDirectionsToPipes = (directions) => {
+  if (directions.length != 2) {
+    throw new Error("Incorrect directions");
+  }
+
+  const [first, second] = directions;
+
+  const firstX = first[0] * -1;
+  const firstY = first[1] * 2;
+  const secondX = second[0] * -1;
+  const secondY = second[1] * 2;
+
+  const dir = [firstX, firstY, secondX, secondY].filter((x) => x !== 0);
+
+  pipes["S"] = dir;
+};
 
 /**
  * @param {string} puzzleData
@@ -42,15 +58,26 @@ const solvePuzzle = (puzzleData, part) => {
   loopCoordinates[startRow].add(startCol);
 
   const startDirections = directions.filter((v) => {
+    if (
+      startRow + v[0] < 0 ||
+      startRow + v[0] > map.length ||
+      startCol + v[1] < 0 ||
+      startCol + v[1] > map[0].length
+    ) {
+      return;
+    }
     const neighborhood = map[startRow + v[0]][startCol + v[1]];
     const neighborhoodConnection = pipes[neighborhood];
-    const startConnection = v[0] === 0 ? v[1] * -2 : v[0] * -1;
-    return (
+
+    const startConnection = v[0] === 0 ? v[1] * 2 : v[0] * -1;
+    const isConnected =
       neighborhoodConnection[0] + startConnection === 0 ||
-      neighborhoodConnection[1] + startConnection === 1
-    );
+      neighborhoodConnection[1] + startConnection === 0;
+
+    return isConnected;
   });
 
+  startDirectionsToPipes(startDirections);
   let stepCounter = 1;
   let previousLocation = [startRow, startCol];
   let currentLocation = [
@@ -81,67 +108,97 @@ const solvePuzzle = (puzzleData, part) => {
     currentLocation = nextCell;
     stepCounter++;
   }
+  const sortedLoop = loopCoordinates.map((x) => [...x].sort());
+
   if (part === 1) {
     return stepCounter / 2;
   }
-
-  const sortedLoop = loopCoordinates.map((x) => [...x].sort());
 
   const checkConnectionWithPrevious = (rowIndex, colIndex) => {
     if (colIndex === 0) {
       return false;
     }
-    const cell = map[rowIndex][colIndex - 1];
+
+    const cell = map[rowIndex][colIndex];
     const cellConnections = pipes[cell];
 
-    return cellConnections.find((x) => x === 2);
+    if (cellConnections.find((x) => x === -2)) {
+      const leftCell = map[rowIndex][colIndex - 1];
+      const leftCellConnections = pipes[leftCell];
+      return Boolean(leftCellConnections.find((x) => x === 2));
+    }
+
+    return false;
   };
 
   let insideLoopCounter = 0;
+
+  const insideLoopCoordinates = new Array(map.length).fill(null).map(() => []);
+
   map.forEach((row, rowIndex) => {
     let isInside = false;
-    let previousMainLoop = null;
 
     row.forEach((c, colIndex) => {
       const isMainLoop =
         sortedLoop[rowIndex].findIndex((x) => x === colIndex) > -1;
 
-      const isConnected = checkConnectionWithPrevious(rowIndex, colIndex);
-
-      if (!isConnected && isMainLoop) {
-        isInside = !isInside;
+      if (isMainLoop) {
+        const isConnected = checkConnectionWithPrevious(rowIndex, colIndex);
+        isInside = isConnected ? false : !isInside;
       }
 
       if (isInside && !isMainLoop) {
+        insideLoopCoordinates[rowIndex].push(colIndex);
         insideLoopCounter++;
       }
     });
   });
+
+  map.forEach((row, rowIndex) => {
+    let rowFormatted = "";
+    row.forEach((c, colIndex) => {
+      if (sortedLoop[rowIndex].findIndex((x) => x === colIndex) > -1) {
+        rowFormatted = rowFormatted + "\x1b[41m" + c + "\x1b[0m";
+        return;
+      }
+      if (
+        insideLoopCoordinates[rowIndex].findIndex((x) => x === colIndex) > -1
+      ) {
+        rowFormatted = rowFormatted + "\x1b[33m" + c + "\x1b[0m";
+        return;
+      }
+      rowFormatted = rowFormatted + c;
+    });
+
+    console.log(rowFormatted);
+  });
+
   return insideLoopCounter;
 };
 
 const firstTest = `
--L||F7
-7S--7|
-L|..||
--L--J|
-L|-|JF
+-L||-F7
+7S---7|
+L|.d.||
+-L---J|
+L|--|JF
 `;
 
 const secondTest = `
-...........
-.S-------7.
-.|F-----7|.
-.||.....||.
-.||.....||.
-.|L-7.F-J|.
-.|..|.|..|.
-.L--J.L--J.
-...........
+FF7FSF7F7F7F7F7F---7
+L|LJ||||||||||||F--J
+FL-7LJLJ||||||LJL-77
+F--JF--7||LJLJ7F7FJ-
+L---JF-JLJ.||-FJLJJ7
+|F|F-JF---7F7-L7L|7|
+|FFJF7L7F-JF7|JL---7
+7-L-JL7||F7|L7F-7F7|
+L.L7LFJ|||||FJL7||LJ
+L7JLJL-JLJLJL--JLJ.L
 `;
 
 console.log("First test:\t", solvePuzzle(firstTest, 1));
-// console.log("Second test:\t", solvePuzzle(secondTest, 1));
+// console.log("Second test:\t", solvePuzzle(secondTest, 2));
 
 const dayInput = fs
   .readFileSync(path.join(__dirname, "../input/10.txt"))
