@@ -5,73 +5,52 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const getShift = (array, val) => {
+  return [...array, val].sort((a, b) => a - b).findIndex((x) => x === val);
+};
+
+const findAdjustment = (shiftDiff, coefficient) =>
+  coefficient * Math.abs(shiftDiff) - Math.abs(shiftDiff);
+
 /**
  * @param {string} puzzleData
  * @param {1|2} part
  */
-const solvePuzzle = (puzzleData, part) => {
+const solvePuzzle = (puzzleData, coefficient) => {
   const map = puzzleData
     .split("\n")
     .filter((x) => x !== "")
     .map((r) => [...r]);
 
-  let adjustedMap = [...map];
+  let emptyColumns = new Array(map[0].length).fill().map((x, ind) => ind);
+  const emptyRows = [];
 
-  let columnWithoutGalaxies = new Array(map[0].length)
-    .fill()
-    .map((x, ind) => ind);
-
-  map.forEach((row) => {
+  map.forEach((row, index) => {
     const withGalaxies = [];
-    columnWithoutGalaxies.forEach((x) => {
+    emptyColumns.forEach((x) => {
       if (row[x] === "#") {
         withGalaxies.push(x);
       }
     });
 
+    if (row.filter((c) => c === "#").length === 0) {
+      emptyRows.push(index);
+    }
+
     withGalaxies.forEach((x) => {
-      const index = columnWithoutGalaxies.findIndex((c) => x === c);
-      columnWithoutGalaxies = [
-        ...columnWithoutGalaxies.slice(0, index),
-        ...columnWithoutGalaxies.slice(index + 1),
+      const index = emptyColumns.findIndex((c) => x === c);
+      emptyColumns = [
+        ...emptyColumns.slice(0, index),
+        ...emptyColumns.slice(index + 1),
       ];
     });
   });
 
-  columnWithoutGalaxies.forEach((x, ind) => {
-    columnWithoutGalaxies[ind] = columnWithoutGalaxies[ind] + ind;
-  });
-
-  adjustedMap.forEach((row, index) => {
-    columnWithoutGalaxies.forEach((x) => {
-      adjustedMap[index] = [
-        ...adjustedMap[index].slice(0, x),
-        ".",
-        ...adjustedMap[index].slice(x),
-      ];
-    });
-  });
-
-  const rowWithoutGalaxies = adjustedMap.filter(
-    (row) => row.filter((c) => c === "#").length === 0
-  );
-  const filling = new Array(rowWithoutGalaxies[0]?.length ?? 0)
-    .fill()
-    .map(() => ".");
-
-  rowWithoutGalaxies.forEach((emptyRow) => {
-    const index = adjustedMap.findIndex((row) => row === emptyRow);
-
-    adjustedMap = [
-      ...adjustedMap.slice(0, index),
-      filling,
-      ...adjustedMap.slice(index),
-    ];
-  });
-
+  /**
+   * @type {{x: number, y: number}[]}
+   */
   const galaxyLocations = [];
-
-  adjustedMap.forEach((row, y) => {
+  map.forEach((row, y) => {
     row.forEach((col, x) => {
       if (col === "#") {
         galaxyLocations.push({ x, y });
@@ -80,17 +59,23 @@ const solvePuzzle = (puzzleData, part) => {
   });
 
   let path = 0;
-
   galaxyLocations.forEach((current, ind) => {
+    const rowShift = getShift(emptyRows, current.y);
+    const colShift = getShift(emptyColumns, current.x);
     for (let i = ind + 1; i < galaxyLocations.length; i++) {
+      const nextRowShift = getShift(emptyRows, galaxyLocations[i].y);
+      const nextColShift = getShift(emptyColumns, galaxyLocations[i].x);
+
       path =
         path +
         Math.abs(current.x - galaxyLocations[i].x) +
-        Math.abs(current.y - galaxyLocations[i].y);
+        Math.abs(current.y - galaxyLocations[i].y) +
+        findAdjustment(rowShift - nextRowShift, coefficient) +
+        findAdjustment(colShift - nextColShift, coefficient);
     }
   });
+
   return path;
-  return `\n${adjustedMap.map((x) => x.join("")).join("\n")}`;
 };
 
 const firstTest = `
@@ -106,12 +91,18 @@ const firstTest = `
 #...#.....
 `;
 
-console.log("First test:\t", solvePuzzle(firstTest, 1));
-// console.log("Second test:\t", solvePuzzle(secondTest, 2));
+// 374
+console.log("First test:\t", solvePuzzle(firstTest, 2));
+// 1030
+console.log("Second test:\t", solvePuzzle(firstTest, 10));
+// 8410
+console.log("Third test:\t", solvePuzzle(firstTest, 100));
 
 const dayInput = fs
   .readFileSync(path.join(__dirname, "../input/11.txt"))
   .toString();
 
-console.log("First part:\t", solvePuzzle(dayInput, 1));
-// console.log("Second part:\t", solvePuzzle(dayInput, 2));
+// 9536038
+console.log("First part:\t", solvePuzzle(dayInput, 2));
+// 447744640566
+console.log("Second part:\t", solvePuzzle(dayInput, 1_000_000));
